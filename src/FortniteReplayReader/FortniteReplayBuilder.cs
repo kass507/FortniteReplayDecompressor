@@ -554,15 +554,44 @@ public class FortniteReplayBuilder
     public void UpdateChest(uint channelIndex, BaseContainer chest)
     {
         Console.WriteLine($"=== CHEST Channel {channelIndex} ===");
-        Console.WriteLine($"Tipo real: {chest.GetType().FullName}");
+        
+        // Ver todos los tipos en la jerarquía
+        var currentType = chest.GetType();
+        Console.WriteLine($"Tipo real completo: {currentType.FullName}");
+        Console.WriteLine($"Assembly: {currentType.Assembly.GetName().Name}");
         Console.WriteLine();
-        PrintProperties(chest, "", 0);
+        
+        // Contar propiedades por nivel
+        var baseProps = typeof(BaseContainer).GetProperties().Length;
+        var actualProps = currentType.GetProperties(
+            System.Reflection.BindingFlags.Public | 
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.FlattenHierarchy
+        ).Length;
+        
+        Console.WriteLine($"Propiedades en BaseContainer: {baseProps}");
+        Console.WriteLine($"Propiedades totales en {currentType.Name}: {actualProps}");
+        Console.WriteLine($"Propiedades adicionales: {actualProps - baseProps}");
+        Console.WriteLine();
+        
+        PrintAllProperties(chest);
         Console.WriteLine("===============================\n");
     }
 
-    void PrintProperties(object obj, string indent = "", int depth = 0, HashSet<object> visited = null)
+    string GetTypeHierarchy(Type type)
     {
-        // Protección contra referencias circulares
+        var hierarchy = new List<string>();
+        var current = type;
+        while (current != null && current != typeof(object))
+        {
+            hierarchy.Add(current.Name);
+            current = current.BaseType;
+        }
+        return string.Join(" -> ", hierarchy);
+    }
+
+    void PrintAllProperties(object obj, string indent = "", int depth = 0, HashSet<object> visited = null)
+    {
         visited ??= new HashSet<object>();
         
         if (obj == null)
@@ -573,7 +602,7 @@ public class FortniteReplayBuilder
 
         var type = obj.GetType();
 
-        // Evitar recursión infinita
+        // Protección circular
         if (!type.IsValueType && visited.Contains(obj))
         {
             Console.WriteLine($"{indent}[Circular Reference]");
@@ -585,21 +614,21 @@ public class FortniteReplayBuilder
             visited.Add(obj);
         }
 
-        // Tipos primitivos y strings
+        // Tipos simples
         if (type.IsPrimitive || type == typeof(string) || type.IsEnum || type == typeof(decimal))
         {
             Console.WriteLine($"{indent}{obj}");
             return;
         }
 
-        // Arrays y colecciones (IEnumerable)
+        // Colecciones
         if (obj is IEnumerable enumerable && !(obj is string))
         {
             int i = 0;
             foreach (var item in enumerable)
             {
                 Console.WriteLine($"{indent}[{i}] ({item?.GetType().Name ?? "null"}):");
-                PrintProperties(item, indent + "  ", depth + 1, visited);
+                PrintAllProperties(item, indent + "  ", depth + 1, visited);
                 i++;
             }
             if (i == 0)
@@ -609,56 +638,72 @@ public class FortniteReplayBuilder
             return;
         }
 
-        // Objetos complejos
+        // Objetos complejos - OBTENER TODAS LAS PROPIEDADES (públicas, privadas, heredadas)
         Console.WriteLine($"{indent}{{");
         
-        var properties = type.GetProperties(System.Reflection.BindingFlags.Public | 
-                                        System.Reflection.BindingFlags.Instance);
+        var allProperties = type.GetProperties(
+            System.Reflection.BindingFlags.Public | 
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.FlattenHierarchy  // ← Esto captura propiedades heredadas
+        );
         
-        foreach (var prop in properties)
+        // Agrupar por clase de origen para ver qué viene de dónde
+        var propertiesByDeclaringType = allProperties
+            .GroupBy(p => p.DeclaringType?.Name ?? "Unknown")
+            .OrderBy(g => g.Key);
+        
+        foreach (var group in propertiesByDeclaringType)
         {
-            try
+            Console.WriteLine($"{indent}  // Propiedades de: {group.Key}");
+            
+            foreach (var prop in group.OrderBy(p => p.Name))
             {
-                var value = prop.GetValue(obj);
-                var propType = prop.PropertyType;
-                
-                // Mostrar el nombre de la propiedad con su tipo
-                string typeInfo = propType.Name;
-                if (propType.IsGenericType)
+                try
                 {
-                    var genericArgs = string.Join(", ", propType.GetGenericArguments().Select(t => t.Name));
-                    typeInfo = $"{propType.Name.Split('`')[0]}<{genericArgs}>";
+                    var value = prop.GetValue(obj);
+                    var propType = prop.PropertyType;
+                    
+                    string typeInfo = GetFriendlyTypeName(propType);
+                    
+                    Console.Write($"{indent}  {prop.Name} ({typeInfo}): ");
+                    
+                    if (value == null)
+                    {
+                        Console.WriteLine("null");
+                    }
+                    else if (propType.IsPrimitive || propType == typeof(string) || 
+                            propType.IsEnum || propType == typeof(decimal))
+                    {
+                        Console.WriteLine(value);
+                    }
+                    else if (value is IEnumerable && !(value is string))
+                    {
+                        Console.WriteLine();
+                        PrintAllProperties(value, indent + "    ", depth + 1, visited);
+                    }
+                    else
+                    {
+                        Console.WriteLine();
+                        PrintAllProperties(value, indent + "    ", depth + 1, visited);
+                    }
                 }
-                
-                Console.Write($"{indent}  {prop.Name} ({typeInfo}): ");
-                
-                if (value == null)
+                catch (Exception ex)
                 {
-                    Console.WriteLine("null");
+                    Console.WriteLine($"[Error: {ex.Message}]");
                 }
-                else if (propType.IsPrimitive || propType == typeof(string) || 
-                        propType.IsEnum || propType == typeof(decimal))
-                {
-                    Console.WriteLine(value);
-                }
-                else if (value is IEnumerable && !(value is string))
-                {
-                    Console.WriteLine();
-                    PrintProperties(value, indent + "    ", depth + 1, visited);
-                }
-                else
-                {
-                    Console.WriteLine();
-                    PrintProperties(value, indent + "    ", depth + 1, visited);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"{indent}  {prop.Name}: [Error: {ex.Message}]");
             }
         }
         
         Console.WriteLine($"{indent}}}");
+    }
+
+    string GetFriendlyTypeName(Type type)
+    {
+        if (!type.IsGenericType)
+            return type.Name;
+        
+        var genericArgs = string.Join(", ", type.GetGenericArguments().Select(t => t.Name));
+        return $"{type.Name.Split('`')[0]}<{genericArgs}>";
     }
 
 
