@@ -553,79 +553,113 @@ public class FortniteReplayBuilder
 
     public void UpdateChest(uint channelIndex, BaseContainer chest)
     {
-        /*var actor = new WorldActor
-        {
-            ChannelId = channelIndex,
-            ActorType = chest.GetType().Name,
-            Location = chest.ReplicatedMovement?.Location, // si tu BaseContainer tiene ReplicatedMovement
-        };
-
-        MapData.Chests ??= new List<WorldActor>(); // agrega una lista de chests en MapData
-        MapData.Chests.Add(actor);*/
+        Console.WriteLine($"=== CHEST Channel {channelIndex} ===");
         Console.WriteLine($"Tipo real: {chest.GetType().FullName}");
-        PrintProperties(chest);
-
-        Console.WriteLine("-------------------------------");
-    }
-    void PrintProperties(object obj, string indent = "")
-{
-    if (obj == null)
-    {
-        Console.WriteLine($"{indent}null");
-        return;
+        Console.WriteLine();
+        PrintProperties(chest, "", 0);
+        Console.WriteLine("===============================\n");
     }
 
-    var type = obj.GetType();
-
-    // Si es tipo simple, imprime directo
-    if (type.IsPrimitive || type == typeof(string) || type.IsEnum || type == typeof(decimal))
+    void PrintProperties(object obj, string indent = "", int depth = 0, HashSet<object> visited = null)
     {
-        Console.WriteLine($"{indent}{obj}");
-        return;
-    }
-
-    // Si es un array o lista
-    if (obj is IEnumerable enumerable && !(obj is string))
-    {
-        int i = 0;
-        foreach (var item in enumerable)
+        // Protección contra referencias circulares
+        visited ??= new HashSet<object>();
+        
+        if (obj == null)
         {
-            Console.WriteLine($"{indent}[{i}]:");
-            PrintProperties(item, indent + "  ");
-            i++;
+            Console.WriteLine($"{indent}null");
+            return;
         }
-        if (i == 0)
+
+        var type = obj.GetType();
+
+        // Evitar recursión infinita
+        if (!type.IsValueType && visited.Contains(obj))
         {
-            Console.WriteLine($"{indent}Empty");
+            Console.WriteLine($"{indent}[Circular Reference]");
+            return;
         }
-        return;
-    }
 
-    Console.WriteLine($"{indent}--- {type.Name} ---");
-
-    foreach (var prop in type.GetProperties())
-    {
-        try
+        if (!type.IsValueType)
         {
-            var value = prop.GetValue(obj);
-            
-            // Si es tipo simple, imprime directo
-            if (value == null || prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum || prop.PropertyType == typeof(decimal))
+            visited.Add(obj);
+        }
+
+        // Tipos primitivos y strings
+        if (type.IsPrimitive || type == typeof(string) || type.IsEnum || type == typeof(decimal))
+        {
+            Console.WriteLine($"{indent}{obj}");
+            return;
+        }
+
+        // Arrays y colecciones (IEnumerable)
+        if (obj is IEnumerable enumerable && !(obj is string))
+        {
+            int i = 0;
+            foreach (var item in enumerable)
             {
-                Console.WriteLine($"{indent}{prop.Name}: {value ?? "null"}");
+                Console.WriteLine($"{indent}[{i}] ({item?.GetType().Name ?? "null"}):");
+                PrintProperties(item, indent + "  ", depth + 1, visited);
+                i++;
             }
-            else
+            if (i == 0)
             {
-                Console.WriteLine($"{indent}{prop.Name}:");
-                PrintProperties(value, indent + "  ");
+                Console.WriteLine($"{indent}(Empty Collection)");
+            }
+            return;
+        }
+
+        // Objetos complejos
+        Console.WriteLine($"{indent}{{");
+        
+        var properties = type.GetProperties(System.Reflection.BindingFlags.Public | 
+                                        System.Reflection.BindingFlags.Instance);
+        
+        foreach (var prop in properties)
+        {
+            try
+            {
+                var value = prop.GetValue(obj);
+                var propType = prop.PropertyType;
+                
+                // Mostrar el nombre de la propiedad con su tipo
+                string typeInfo = propType.Name;
+                if (propType.IsGenericType)
+                {
+                    var genericArgs = string.Join(", ", propType.GetGenericArguments().Select(t => t.Name));
+                    typeInfo = $"{propType.Name.Split('`')[0]}<{genericArgs}>";
+                }
+                
+                Console.Write($"{indent}  {prop.Name} ({typeInfo}): ");
+                
+                if (value == null)
+                {
+                    Console.WriteLine("null");
+                }
+                else if (propType.IsPrimitive || propType == typeof(string) || 
+                        propType.IsEnum || propType == typeof(decimal))
+                {
+                    Console.WriteLine(value);
+                }
+                else if (value is IEnumerable && !(value is string))
+                {
+                    Console.WriteLine();
+                    PrintProperties(value, indent + "    ", depth + 1, visited);
+                }
+                else
+                {
+                    Console.WriteLine();
+                    PrintProperties(value, indent + "    ", depth + 1, visited);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{indent}  {prop.Name}: [Error: {ex.Message}]");
             }
         }
-        catch
-        {
-            Console.WriteLine($"{indent}{prop.Name}: no se pudo leer");
-        }
+        
+        Console.WriteLine($"{indent}}}");
     }
-}
 
 
     public void UpdateSupplyDrop(uint channelIndex, Models.NetFieldExports.SupplyDrop supplyDrop)
