@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using FortniteReplayReader.Models.World;
+using System.Collections.Concurrent;
+
 
 namespace FortniteReplayReader;
 
@@ -20,8 +22,8 @@ public class FortniteReplayBuilder
     private readonly Dictionary<uint, uint> _actorToChannel = new();
     private readonly Dictionary<uint, uint> _channelToActor = new();
     private readonly Dictionary<uint, uint> _pawnChannelToStateChannel = new();
-    private readonly ConcurrentDictionary<uint, WorldActor> _aiPawns = new();
     private readonly Dictionary<uint, WorldActor> _aiPawns = new();
+
 
 
 
