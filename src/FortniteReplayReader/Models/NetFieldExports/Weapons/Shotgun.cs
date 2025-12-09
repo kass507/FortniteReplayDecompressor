@@ -4,12 +4,12 @@ using Unreal.Core.Models.Enums;
 
 namespace FortniteReplayReader.Models.NetFieldExports.Weapons;
 
-[NetFieldExportGroup("/Game/Weapons/FORT_Shotguns/Blueprints/B_Shotgun_Heavy_Athena.B_Shotgun_Heavy_Athena_C", minimalParseMode: ParseMode.Debug)]
+[NetFieldExportGroup("/Game/Weapons/FORT_Shotguns/Blueprints/B_Shotgun_Heavy_Athena.B_Shotgun_Heavy_Athena_C", minimalParseMode: ParseMode.Normal)]
 public class HeavyShotgun : BaseWeapon
 {
 }
 
-[NetFieldExportGroup("/Game/Weapons/FORT_Shotguns/Blueprints/B_Shotgun_Standard_Athena.B_Shotgun_Standard_Athena_C", minimalParseMode: ParseMode.Debug)]
+[NetFieldExportGroup("/Game/Weapons/FORT_Shotguns/Blueprints/B_Shotgun_Standard_Athena.B_Shotgun_Standard_Athena_C", minimalParseMode: ParseMode.Normal)]
 public class StandardShotgun : BaseWeapon
 {
 }
