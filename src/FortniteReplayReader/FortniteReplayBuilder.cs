@@ -320,14 +320,21 @@ public class FortniteReplayBuilder
             _aiPawns[channelId] = actor;
         }
 
-        if (pawn.ReplicatedMovement != null)
-        {
-            actor.Location = pawn.ReplicatedMovement.Location;
-            actor.Rotation = pawn.ReplicatedMovement.Rotation;
-        }
+        if (pawn.ReplicatedMovement.HasValue)
+            {
+                var repMov = pawn.ReplicatedMovement.Value;
 
-        actor.Time = ReplicatedWorldTimeSeconds;
-        actor.TimeDouble = ReplicatedWorldTimeSecondsDouble;
+                Console.WriteLine($"=== FRepMovement for channel {channelId} ===");
+                Console.WriteLine(repMov); // esto imprimirá algo si ToString() está implementado
+
+                // Para inspeccionar más a fondo:
+                var type = repMov.GetType();
+                foreach (var prop in type.GetProperties())
+                {
+                    var value = prop.GetValue(repMov);
+                    Console.WriteLine($"{prop.Name} = {value}");
+                }
+            }
     }
 
 
