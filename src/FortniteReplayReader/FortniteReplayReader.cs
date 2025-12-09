@@ -5,6 +5,7 @@ using FortniteReplayReader.Models.Enums;
 using FortniteReplayReader.Models.Events;
 using FortniteReplayReader.Models.NetFieldExports;
 using FortniteReplayReader.Models.NetFieldExports.Weapons;
+using FortniteReplayReader.Models.NetFieldExports.Items;
 using FortniteReplayReader.Models.World;
 using System.Collections.Generic;
 
