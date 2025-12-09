@@ -561,16 +561,45 @@ public class FortniteReplayBuilder
 
         MapData.Chests ??= new List<WorldActor>(); // agrega una lista de chests en MapData
         MapData.Chests.Add(actor);*/
-        var props = chest.GetType();
         Console.WriteLine($"Tipo real: {chest.GetType().FullName}");
-        foreach (var prop in props.GetProperties())
-        {
-            try { Console.WriteLine($"{prop.Name}: {prop.GetValue(chest)}"); }
-            catch { Console.WriteLine($"{prop.Name}: no se pudo leer"); }
-        }
+        PrintProperties(chest);
 
         Console.WriteLine("-------------------------------");
     }
+    void PrintProperties(object obj, string indent = "")
+    {
+        if (obj == null)
+        {
+            Console.WriteLine($"{indent}null");
+            return;
+        }
+
+        var type = obj.GetType();
+        Console.WriteLine($"{indent}--- {type.Name} ---");
+
+        foreach (var prop in type.GetProperties())
+        {
+            try
+            {
+                var value = prop.GetValue(obj);
+                // Si es un tipo simple, imprime directo
+                if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)
+                {
+                    Console.WriteLine($"{indent}{prop.Name}: {value}");
+                }
+                else
+                {
+                    Console.WriteLine($"{indent}{prop.Name}:");
+                    PrintProperties(value, indent + "  ");
+                }
+            }
+            catch
+            {
+                Console.WriteLine($"{indent}{prop.Name}: no se pudo leer");
+            }
+        }
+    }
+
 
     public void UpdateSupplyDrop(uint channelIndex, Models.NetFieldExports.SupplyDrop supplyDrop)
     {
