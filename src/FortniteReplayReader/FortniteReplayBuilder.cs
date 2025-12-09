@@ -4,6 +4,7 @@ using FortniteReplayReader.Models.NetFieldExports.Weapons;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using FortniteReplayReader.Models.World;
 
 namespace FortniteReplayReader;
 
@@ -19,6 +20,10 @@ public class FortniteReplayBuilder
     private readonly Dictionary<uint, uint> _actorToChannel = new();
     private readonly Dictionary<uint, uint> _channelToActor = new();
     private readonly Dictionary<uint, uint> _pawnChannelToStateChannel = new();
+    private readonly ConcurrentDictionary<uint, WorldActor> _aiPawns = new();
+    private readonly Dictionary<uint, WorldActor> _aiPawns = new();
+
+
 
     /// <summary>
     /// Sometimes we receive a PlayerPawn but we havent received the PlayerState yet, so we dont want to processes these yet.
@@ -64,6 +69,7 @@ public class FortniteReplayBuilder
         replay.KillFeed = KillFeed;
         replay.TeamData = _teams.Values;
         replay.PlayerData = _players.Values;
+        replay.AIPawns = _aiPawns.Values.ToList();
         return replay;
     }
 
@@ -299,6 +305,29 @@ public class FortniteReplayBuilder
 
         KillFeed.Add(entry);
     }
+
+    public void UpdateAIPawn(uint channelId, PlayerPawn pawn)
+    {
+        if (!_aiPawns.TryGetValue(channelId, out var actor))
+        {
+            actor = new WorldActor
+            {
+                ChannelId = channelId,
+                ActorType = pawn.GetType().Name
+            };
+            _aiPawns[channelId] = actor;
+        }
+
+        if (pawn.ReplicatedMovement != null)
+        {
+            actor.Location = pawn.ReplicatedMovement.Location;
+            actor.Rotation = pawn.ReplicatedMovement.Rotation;
+        }
+
+        actor.Time = ReplicatedWorldTimeSeconds;
+        actor.TimeDouble = ReplicatedWorldTimeSecondsDouble;
+    }
+
 
     public void UpdatePlayerPawn(uint channelIndex, PlayerPawn pawn)
     {

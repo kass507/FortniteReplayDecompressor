@@ -110,6 +110,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
             case FortPlayerState state:
                 Builder.UpdatePlayerState(channelIndex, state);
                 break;
+            case PhoebePlayerPawn phoebe:
+                Builder.UpdateAIPawn(channelIndex, phoebe);
+                break;
             case PlayerPawn pawn:
                 Builder.UpdatePlayerPawn(channelIndex, pawn);
                 break;
