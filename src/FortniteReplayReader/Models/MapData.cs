@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Unreal.Core.Models;
+using FortniteReplayReader.Models.World;
 
 namespace FortniteReplayReader.Models;
 
