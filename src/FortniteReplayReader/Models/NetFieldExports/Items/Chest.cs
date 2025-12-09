@@ -42,3 +42,19 @@ public class FactionChest : BaseContainer
     [NetFieldExport("T_Faction", RepLayoutCmdType.Enum)]
     public int? Faction { get; set; }
 }
+
+[NetFieldExportGroup("/Umbramolt_Kipper/Gameplay/Actors/B_Weap_Umbramolt_Kipper.B_Weap_Umbramolt_Kipper_C", minimalParseMode: ParseMode.Normal)]
+public class Umbramolt_Kipper : BaseContainer
+{
+    [NetFieldExport("bDestroyOnPlayerBuildingPlacement", RepLayoutCmdType.PropertyBool)]
+    public bool bDestroyOnPlayerBuildingPlacement { get; set; }
+
+    [NetFieldExport("ResourceType", RepLayoutCmdType.Enum)]
+    public int ResourceType { get; set; }
+
+    [NetFieldExport("ProxyGameplayCueDamagePhysicalMagnitude", RepLayoutCmdType.Ignore)]
+    public DebuggingObject ProxyGameplayCueDamagePhysicalMagnitude { get; set; }
+
+    [NetFieldExport("EffectContext", RepLayoutCmdType.Ignore)]
+    public DebuggingObject EffectContext { get; set; }
+}

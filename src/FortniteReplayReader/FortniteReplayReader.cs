@@ -149,6 +149,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdateWeapon(channelIndex, weapon);
                 break;
             //---------------------
+            case Umbramolt_Kipper umbramolt_Kipper:
+                Builder.UpdateChest(channelIndex, umbramolt_Kipper);
+                break;
             case CreativeChest creativeChest:
                 Builder.UpdateChest(channelIndex, creativeChest);
                 break;
