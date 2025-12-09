@@ -36,6 +36,8 @@ public class FortniteReplay : Replay
     /// </summary>
     public IEnumerable<PlayerData> PlayerData { get; internal set; }
 
+    public List<WorldActor> AIPawns { get; set; } = new();
+
     /// <summary>
     /// Eliminations based on the network chunks.
     /// </summary>

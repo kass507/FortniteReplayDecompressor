@@ -326,7 +326,7 @@ public class FortniteReplayBuilder
             {
                 var repMov = pawn.ReplicatedMovement.Value;
 
-                _logger.LogD.WriteLine($"=== FRepMovement for channel {channelId} ===");
+                Console.WriteLine($"=== FRepMovement for channel {channelId} ===");
                 Console.WriteLine(repMov); // esto imprimirá algo si ToString() está implementado
 
                 // Para inspeccionar más a fondo:
