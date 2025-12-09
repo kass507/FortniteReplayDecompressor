@@ -567,38 +567,64 @@ public class FortniteReplayBuilder
         Console.WriteLine("-------------------------------");
     }
     void PrintProperties(object obj, string indent = "")
+{
+    if (obj == null)
     {
-        if (obj == null)
+        Console.WriteLine($"{indent}null");
+        return;
+    }
+
+    var type = obj.GetType();
+
+    // Si es tipo simple, imprime directo
+    if (type.IsPrimitive || type == typeof(string) || type.IsEnum || type == typeof(decimal))
+    {
+        Console.WriteLine($"{indent}{obj}");
+        return;
+    }
+
+    // Si es un array o lista
+    if (obj is IEnumerable enumerable && !(obj is string))
+    {
+        int i = 0;
+        foreach (var item in enumerable)
         {
-            Console.WriteLine($"{indent}null");
-            return;
+            Console.WriteLine($"{indent}[{i}]:");
+            PrintProperties(item, indent + "  ");
+            i++;
         }
-
-        var type = obj.GetType();
-        Console.WriteLine($"{indent}--- {type.Name} ---");
-
-        foreach (var prop in type.GetProperties())
+        if (i == 0)
         {
-            try
+            Console.WriteLine($"{indent}Empty");
+        }
+        return;
+    }
+
+    Console.WriteLine($"{indent}--- {type.Name} ---");
+
+    foreach (var prop in type.GetProperties())
+    {
+        try
+        {
+            var value = prop.GetValue(obj);
+            
+            // Si es tipo simple, imprime directo
+            if (value == null || prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum || prop.PropertyType == typeof(decimal))
             {
-                var value = prop.GetValue(obj);
-                // Si es un tipo simple, imprime directo
-                if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)
-                {
-                    Console.WriteLine($"{indent}{prop.Name}: {value}");
-                }
-                else
-                {
-                    Console.WriteLine($"{indent}{prop.Name}:");
-                    PrintProperties(value, indent + "  ");
-                }
+                Console.WriteLine($"{indent}{prop.Name}: {value ?? "null"}");
             }
-            catch
+            else
             {
-                Console.WriteLine($"{indent}{prop.Name}: no se pudo leer");
+                Console.WriteLine($"{indent}{prop.Name}:");
+                PrintProperties(value, indent + "  ");
             }
+        }
+        catch
+        {
+            Console.WriteLine($"{indent}{prop.Name}: no se pudo leer");
         }
     }
+}
 
 
     public void UpdateSupplyDrop(uint channelIndex, Models.NetFieldExports.SupplyDrop supplyDrop)
