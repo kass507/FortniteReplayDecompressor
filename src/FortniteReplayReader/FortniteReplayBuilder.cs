@@ -561,7 +561,7 @@ public class FortniteReplayBuilder
 
         MapData.Chests ??= new List<WorldActor>(); // agrega una lista de chests en MapData
         MapData.Chests.Add(actor);*/
-        var props = chest.GetType()
+        var props = chest.GetType();
         Console.WriteLine($"Tipo real: {chest.GetType().FullName}");
         foreach (var prop in props)
         {
