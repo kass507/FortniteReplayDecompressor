@@ -147,6 +147,16 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
             case BaseWeapon weapon:
                 Builder.UpdateWeapon(channelIndex, weapon);
                 break;
+            //---------------------
+            case Chest chest:
+                Builder.UpdateChest(channelIndex, chest);
+                break;
+            case CreativeChest creativeChest:
+                Builder.UpdateChest(channelIndex, creativeChest);
+                break;
+            case FactionChest factionChest:
+                Builder.UpdateChest(channelIndex, factionChest);
+                break;
         }
     }
 

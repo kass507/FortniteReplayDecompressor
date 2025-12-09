@@ -8,6 +8,7 @@ public class MapData
     public IEnumerable<BattleBus> BattleBusFlightPaths { get; internal set; }
     public IList<SafeZone> SafeZones { get; internal set; } = new List<SafeZone>();
     public IList<Llama> Llamas { get; internal set; } = new List<Llama>();
+    public IList<WorldActor> Chests { get; internal set; } = new List<WorldActor>();
     public IList<SupplyDrop> SupplyDrops { get; internal set; } = new List<SupplyDrop>();
     public IList<RebootVan> RebootVans { get; internal set; } = new List<RebootVan>();
 

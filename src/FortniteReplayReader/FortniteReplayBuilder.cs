@@ -326,17 +326,19 @@ public class FortniteReplayBuilder
         if (pawn.ReplicatedMovement.HasValue)
             {
                 var repMov = pawn.ReplicatedMovement.Value;
+                actor.Location = repMov.Location;
+                actor.Rotation = repMov.Rotation;
 
-                Console.WriteLine($"=== FRepMovement for channel {channelId} ===");
-                Console.WriteLine(repMov); // esto imprimirá algo si ToString() está implementado
+                //Console.WriteLine($"=== FRepMovement for channel {channelId} ===");
+                //Console.WriteLine(repMov); // esto imprimirá algo si ToString() está implementado
 
                 // Para inspeccionar más a fondo:
-                var type = repMov.GetType();
+                /*var type = repMov.GetType();
                 foreach (var prop in type.GetProperties())
                 {
                     var value = prop.GetValue(repMov);
                     Console.WriteLine($"{prop.Name} = {value}");
-                }
+                }*/
             }
     }
 
@@ -546,6 +548,36 @@ public class FortniteReplayBuilder
         {
             llama.HasSpawnedPickups = true;
         }
+    }
+
+    public void UpdateChest(uint channelIndex, BaseContainer chest)
+    {
+        /*var actor = new WorldActor
+        {
+            ChannelId = channelIndex,
+            ActorType = chest.GetType().Name,
+            Location = chest.ReplicatedMovement?.Location, // si tu BaseContainer tiene ReplicatedMovement
+        };
+
+        MapData.Chests ??= new List<WorldActor>(); // agrega una lista de chests en MapData
+        MapData.Chests.Add(actor);*/
+        var type = chest.GetType();
+        Console.WriteLine($"--- Propiedades de {type.Name} ---");
+
+        foreach (var prop in type.GetProperties())
+        {
+            try
+            {
+                var value = prop.GetValue(chest);
+                Console.WriteLine($"{prop.Name}: {value}");
+            }
+            catch
+            {
+                Console.WriteLine($"{prop.Name}: no se pudo leer");
+            }
+        }
+
+        Console.WriteLine("-------------------------------");
     }
 
     public void UpdateSupplyDrop(uint channelIndex, Models.NetFieldExports.SupplyDrop supplyDrop)
