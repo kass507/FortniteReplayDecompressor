@@ -561,21 +561,13 @@ public class FortniteReplayBuilder
 
         MapData.Chests ??= new List<WorldActor>(); // agrega una lista de chests en MapData
         MapData.Chests.Add(actor);*/
-        var type = chest.GetType();
-        Console.WriteLine($"--- Propiedades de {type.Name} ---");
-
-        foreach (var prop in type.GetProperties())
+        var props = chest.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        foreach (var prop in props)
         {
-            try
-            {
-                var value = prop.GetValue(chest);
-                Console.WriteLine($"{prop.Name}: {value}");
-            }
-            catch
-            {
-                Console.WriteLine($"{prop.Name}: no se pudo leer");
-            }
+            try { Console.WriteLine($"{prop.Name}: {prop.GetValue(chest)}"); }
+            catch { Console.WriteLine($"{prop.Name}: no se pudo leer"); }
         }
+
 
         Console.WriteLine("-------------------------------");
     }

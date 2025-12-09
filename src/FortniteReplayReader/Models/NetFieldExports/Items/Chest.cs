@@ -20,7 +20,7 @@ public class Chest : BaseContainer
     public DebuggingObject EffectContext { get; set; }
 }
 
-[NetFieldExportGroup("/Game/Building/ActorBlueprints/Containers/Creative_Tiered_Chest.Creative_Tiered_Chest_C", minimalParseMode: ParseMode.Debug)]
+[NetFieldExportGroup("/Game/Building/ActorBlueprints/Containers/Creative_Tiered_Chest.Creative_Tiered_Chest_C", minimalParseMode: ParseMode.Normal)]
 public class CreativeChest : Chest
 {
     [NetFieldExport("SpawnItems", RepLayoutCmdType.Property)]
@@ -33,7 +33,7 @@ public class CreativeChest : Chest
     public DebuggingObject Quantity { get; set; }
 }
 
-[NetFieldExportGroup("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_Athena_FactionChest_NoLocks.Tiered_Chest_Athena_FactionChest_NoLocks_C", minimalParseMode: ParseMode.Debug)]
+[NetFieldExportGroup("/Game/Building/ActorBlueprints/Containers/Tiered_Chest_Athena_FactionChest_NoLocks.Tiered_Chest_Athena_FactionChest_NoLocks_C", minimalParseMode: ParseMode.Normal)]
 public class FactionChest : BaseContainer
 {
     [NetFieldExport("bDestroyOnPlayerBuildingPlacement", RepLayoutCmdType.PropertyBool)]
