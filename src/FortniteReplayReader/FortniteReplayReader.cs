@@ -162,6 +162,27 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdateChest(channelIndex, chest);
                 break;
         }
+        if (exportGroup != null)
+    {
+        var typeName = exportGroup.GetType().FullName ?? "";
+        var pathName = exportGroup.GetType()
+            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+            .FirstOrDefault() as NetFieldExportGroupAttribute;
+        
+        // Imprimir todos los actors que contengan "Chest" o "Container"
+        if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
+            typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
+            (pathName?.Path?.Contains("Chest", StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (pathName?.Path?.Contains("Container", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            Console.WriteLine($"=== FOUND POTENTIAL CHEST ===");
+            Console.WriteLine($"Type: {typeName}");
+            Console.WriteLine($"Path: {pathName?.Path ?? "N/A"}");
+            Console.WriteLine($"Channel: {channelIndex}");
+            Builder.UpdateChest(channelIndex, exportGroup);
+            Console.WriteLine("============================\n");
+        }
+    }
     }
 
     protected override void OnExternalDataRead(uint channelIndex, IExternalData? externalData)

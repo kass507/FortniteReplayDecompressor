@@ -569,12 +569,12 @@ public class FortniteReplayBuilder
             System.Reflection.BindingFlags.FlattenHierarchy
         ).Length;
         
-        Console.WriteLine($"Propiedades en BaseContainer: {baseProps}");
-        Console.WriteLine($"Propiedades totales en {currentType.Name}: {actualProps}");
-        Console.WriteLine($"Propiedades adicionales: {actualProps - baseProps}");
-        Console.WriteLine();
+        //Console.WriteLine($"Propiedades en BaseContainer: {baseProps}");
+        //Console.WriteLine($"Propiedades totales en {currentType.Name}: {actualProps}");
+        //Console.WriteLine($"Propiedades adicionales: {actualProps - baseProps}");
+        //Console.WriteLine();
         
-        PrintAllProperties(chest);
+        //PrintAllProperties(chest);
         Console.WriteLine("===============================\n");
     }
 
