@@ -8,7 +8,7 @@ using FortniteReplayReader.Models.NetFieldExports.Weapons;
 using FortniteReplayReader.Models.NetFieldExports.Items;
 using FortniteReplayReader.Models.World;
 using System.Collections.Generic;
-
+using System.Linq; // ← AGREGAR ESTO
 using FortniteReplayReader;
 using Microsoft.Extensions.Logging;
 using System;
@@ -29,7 +29,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 {
     private FortniteReplayBuilder Builder;
     public List<WorldActor> AIPawns { get; set; } = new();
-
 
     public ReplayReader(ILogger logger = null, ParseMode parseMode = ParseMode.Minimal) : base(logger, parseMode)
     {
@@ -93,12 +92,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
             case ActiveGameplayModifier modifier:
                 Builder.UpdateGameplayModifiers(modifier);
                 break;
-            //case FortPickup pickup:
-            //Builder.CreatePickupEvent(channelIndex, pickup);
-            //break;
-            //case FortInventory inventory:
-            //    Builder.UpdateInventory(channelIndex, inventory);
-            //    break;
             case SpawnMachineRepData spawnMachine:
                 Builder.UpdateRebootVan(channelIndex, spawnMachine);
                 break;
@@ -107,6 +100,7 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 
     protected override void OnExportRead(uint channelIndex, INetFieldExportGroup? exportGroup)
     {
+        // Primero el switch original
         switch (exportGroup)
         {
             case GameState state:
@@ -119,18 +113,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdatePlayerState(channelIndex, state);
                 break;
             case PlayerPawn pawn:
-                Builder.UpdateAIPawn(channelIndex, pawn); // Para AI también
-                Builder.UpdatePlayerPawn(channelIndex, pawn); // Para jugadores
+                Builder.UpdateAIPawn(channelIndex, pawn);
+                Builder.UpdatePlayerPawn(channelIndex, pawn);
                 break;
-            //case FortPickup pickup:
-            //Builder.CreatePickupEvent(channelIndex, pickup);
-            //break;
-            //case FortInventory inventory:
-            //    Builder.UpdateInventory(channelIndex, inventory);
-            //    break;
-            //case BroadcastExplosion explosion:
-            //    Builder.UpdateExplosion(explosion);
-            //    break;
             case SafeZoneIndicator safeZone:
                 Builder.UpdateSafeZones(safeZone);
                 break;
@@ -143,13 +128,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
             case FortPoiManager poimanager:
                 Builder.UpdatePoiManager(poimanager);
                 break;
-            //case GameplayCue gameplayCue:
-            //    Builder.UpdateGameplayCue(channelIndex, gameplayCue);
-            //    break;
             case BaseWeapon weapon:
                 Builder.UpdateWeapon(channelIndex, weapon);
                 break;
-            //---------------------
             case Umbramolt_Kipper umbramolt_Kipper:
                 Builder.UpdateChest(channelIndex, umbramolt_Kipper);
                 break;
@@ -163,32 +144,48 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdateChest(channelIndex, chest);
                 break;
         }
-        if (exportGroup != null)
-    {
-        var typeName = exportGroup.GetType().FullName ?? "";
-        var pathName = exportGroup.GetType()
-            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
-            .FirstOrDefault() as NetFieldExportGroupAttribute;
         
-        // Imprimir todos los actors que contengan "Chest" o "Container"
-        if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
-            typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
-            (pathName?.Path?.Contains("Chest", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (pathName?.Path?.Contains("Container", StringComparison.OrdinalIgnoreCase) ?? false))
+        // Luego el detector de chests adicionales
+        if (exportGroup != null)
         {
-            Console.WriteLine($"=== FOUND POTENTIAL CHEST ===");
-            Console.WriteLine($"Type: {typeName}");
-            Console.WriteLine($"Path: {pathName?.Path ?? "N/A"}");
-            Console.WriteLine($"Channel: {channelIndex}");
-            Builder.UpdateChest(channelIndex, exportGroup);
-            Console.WriteLine("============================\n");
+            var typeName = exportGroup.GetType().FullName ?? "";
+            var pathAttribute = exportGroup.GetType()
+                .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+                .Cast<NetFieldExportGroupAttribute>()  // ← Usar Cast en lugar de FirstOrDefault directo
+                .FirstOrDefault();
+            
+            var pathName = pathAttribute?.Path ?? "";
+            
+            // Imprimir todos los actors que contengan "Chest" o "Container"
+            if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
+                typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
+                pathName.Contains("Chest", StringComparison.OrdinalIgnoreCase) ||
+                pathName.Contains("Container", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"=== FOUND POTENTIAL CHEST ===");
+                Console.WriteLine($"Type: {typeName}");
+                Console.WriteLine($"Path: {pathName}");
+                Console.WriteLine($"Channel: {channelIndex}");
+                
+                // Solo llamar UpdateChest si es BaseContainer
+                if (exportGroup is BaseContainer container)
+                {
+                    Builder.UpdateChest(channelIndex, container);
+                }
+                else
+                {
+                    // Si no es BaseContainer, imprimir sus propiedades de todas formas
+                    Console.WriteLine("WARNING: Not a BaseContainer, printing properties:");
+                    Builder.PrintObjectProperties(exportGroup);
+                }
+                
+                Console.WriteLine("============================\n");
+            }
         }
-    }
     }
 
     protected override void OnExternalDataRead(uint channelIndex, IExternalData? externalData)
     {
-        // TODO: at the very least, only use PlayerNameData when handle and netfieldgroup match...
         if (externalData != null)
         {
             Builder.UpdatePrivateName(channelIndex, new PlayerNameData(externalData.Archive));
@@ -201,11 +198,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         Branch = Replay.Header.Branch;
     }
 
-    /// <summary>
-    /// see https://github.com/EpicGames/UnrealEngine/blob/70bc980c6361d9a7d23f6d23ffe322a2d6ef16fb/Engine/Source/Runtime/NetworkReplayStreaming/LocalFileNetworkReplayStreaming/Private/LocalFileNetworkReplayStreaming.cpp#L363
-    /// </summary>
-    /// <param name="archive"></param>
-    /// <returns></returns>
     public override void ReadEvent(FArchive archive)
     {
         var info = new EventInfo
@@ -222,7 +214,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 
         using var decryptedArchive = DecryptBuffer(archive, info.SizeInBytes);
 
-        // Every event seems to start with some unknown int
         if (info.Group == ReplayEventTypes.PLAYER_ELIMINATION)
         {
             var elimination = ParseElimination(decryptedArchive, info);
@@ -299,7 +290,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 
             if (version >= 3)
             {
-                // unknown
                 archive.SkipBytes(1);
 
                 if (version >= 6)
@@ -317,12 +307,10 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
             {
                 if (Major <= 4 && Minor < 2)
                 {
-                    //12 bytes including version int. Always all 0s
                     archive.SkipBytes(8);
                 }
                 else if (Major == 4 && Minor <= 2)
                 {
-                    //Likely transform data with version being part of it, but don't have a replay to verify
                     archive.SkipBytes(36);
                 }
             }

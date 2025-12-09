@@ -770,6 +770,11 @@ public class FortniteReplayBuilder
 
         // ignore PoiTagContainerTable since it is just a list of all POI...
     }
+    // Agregar este método público para cuando encuentres actors que no son BaseContainer
+    public void PrintObjectProperties(object obj)
+    {
+        PrintAllProperties(obj, "", 0, null);
+    }
 
     //public void UpdateGameplayCue(uint channelIndex, GameplayCue gameplayCue)
     //{
