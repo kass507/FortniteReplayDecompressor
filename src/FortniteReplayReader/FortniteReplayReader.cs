@@ -21,6 +21,7 @@ using Unreal.Core.Exceptions;
 using Unreal.Core.Models;
 using Unreal.Core.Models.Enums;
 using Unreal.Encryption;
+using Unreal.Core.Attributes;
 
 namespace FortniteReplayReader;
 
