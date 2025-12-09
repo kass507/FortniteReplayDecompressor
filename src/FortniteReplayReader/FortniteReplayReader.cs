@@ -5,6 +5,7 @@ using FortniteReplayReader.Models.Enums;
 using FortniteReplayReader.Models.Events;
 using FortniteReplayReader.Models.NetFieldExports;
 using FortniteReplayReader.Models.NetFieldExports.Weapons;
+using FortniteReplayReader;
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
@@ -22,6 +23,7 @@ namespace FortniteReplayReader;
 public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 {
     private FortniteReplayBuilder Builder;
+    public List<WorldActor> AIPawns { get; set; } = new();
 
     public ReplayReader(ILogger logger = null, ParseMode parseMode = ParseMode.Minimal) : base(logger, parseMode)
     {
