@@ -22,7 +22,7 @@ using Unreal.Core.Models;
 using Unreal.Core.Models.Enums;
 using Unreal.Encryption;
 using Unreal.Core.Attributes;
-using System.Text.Json; // ← Para serializar JSON
+using System.Text.Json;
 
 namespace FortniteReplayReader;
 
@@ -31,7 +31,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
     private FortniteReplayBuilder Builder;
     public List<WorldActor> AIPawns { get; set; } = new();
     
-    // ← AGREGAR ESTO: Registro de actors
     private ActorRegistry _actorRegistry = new ActorRegistry();
     private string _currentReplayFile;
 
@@ -104,9 +103,25 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         }
     }
 
+    // ← OVERRIDE ESTE MÉTODO para capturar ANTES de deserializar
+    protected override void OnNetFieldExportGroupRead(string pathName, uint pathNameIndex, uint channelIndex)
+    {
+        // Registrar el actor RAW del replay ANTES de cualquier deserialización
+        RegisterRawActor(channelIndex, pathName, pathNameIndex);
+        
+        // Llamar al método base para que continue con el procesamiento normal
+        base.OnNetFieldExportGroupRead(pathName, pathNameIndex, channelIndex);
+    }
+
     protected override void OnExportRead(uint channelIndex, INetFieldExportGroup? exportGroup)
     {
-        // Primero el switch original
+        // Este método solo se llama si SE PUDO deserializar
+        // Marcar este actor como "deserializado exitosamente"
+        if (exportGroup != null)
+        {
+            MarkActorAsDeserialized(channelIndex, exportGroup);
+        }
+        
         switch (exportGroup)
         {
             case GameState state:
@@ -150,48 +165,12 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdateChest(channelIndex, chest);
                 break;
         }
-        
-        // ← REGISTRAR TODOS LOS ACTORS (no solo chests)
-        if (exportGroup != null)
-        {
-            RegisterActor(channelIndex, exportGroup);
-            
-            // Detectar y procesar chests específicamente
-            var typeName = exportGroup.GetType().FullName ?? "";
-            var pathAttribute = exportGroup.GetType()
-                .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
-                .Cast<NetFieldExportGroupAttribute>()
-                .FirstOrDefault();
-            
-            var pathName = pathAttribute?.Path ?? "";
-            
-            if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
-                typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
-                pathName.Contains("Chest", StringComparison.OrdinalIgnoreCase) ||
-                pathName.Contains("Container", StringComparison.OrdinalIgnoreCase))
-            {
-                if (exportGroup is BaseContainer container)
-                {
-                    Builder.UpdateChest(channelIndex, container);
-                }
-            }
-        }
     }
 
-    // ← NUEVO MÉTODO: Registrar actor
-    private void RegisterActor(uint channelIndex, INetFieldExportGroup exportGroup)
+    // ← NUEVO: Registrar actor RAW (directamente del replay)
+    private void RegisterRawActor(uint channelIndex, string pathName, uint pathNameIndex)
     {
-        var typeName = exportGroup.GetType().FullName ?? "Unknown";
-        var pathAttribute = exportGroup.GetType()
-            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
-            .Cast<NetFieldExportGroupAttribute>()
-            .FirstOrDefault();
-        
-        var pathName = pathAttribute?.Path ?? "N/A";
-        
-        // Evitar duplicados exactos
         var exists = _actorRegistry.Actors.Any(a => 
-            a.TypeName == typeName && 
             a.PathName == pathName && 
             a.ChannelIndex == channelIndex);
         
@@ -199,51 +178,92 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         {
             _actorRegistry.Actors.Add(new ActorInfo
             {
-                TypeName = typeName,
+                TypeName = null, // Aún no sabemos si tiene clase C#
+                FullTypeName = null,
                 PathName = pathName,
-                ChannelIndex = channelIndex
+                PathNameIndex = pathNameIndex,
+                ChannelIndex = channelIndex,
+                HasCSharpClass = false,
+                IsDeserialized = false
             });
         }
     }
 
-    // ← NUEVO MÉTODO: Guardar el registro al finalizar
+    // ← NUEVO: Marcar como deserializado
+    private void MarkActorAsDeserialized(uint channelIndex, INetFieldExportGroup exportGroup)
+    {
+        var pathAttribute = exportGroup.GetType()
+            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+            .Cast<NetFieldExportGroupAttribute>()
+            .FirstOrDefault();
+        
+        var pathName = pathAttribute?.Path ?? "";
+        
+        var actor = _actorRegistry.Actors.FirstOrDefault(a => 
+            a.PathName == pathName && 
+            a.ChannelIndex == channelIndex);
+        
+        if (actor != null)
+        {
+            actor.TypeName = exportGroup.GetType().Name;
+            actor.FullTypeName = exportGroup.GetType().FullName;
+            actor.HasCSharpClass = true;
+            actor.IsDeserialized = true;
+        }
+    }
+
     public void SaveActorRegistry(string outputPath = null)
     {
         if (outputPath == null)
         {
-            // Si no se especifica ruta, guardar al lado del replay
             var replayDir = Path.GetDirectoryName(_currentReplayFile) ?? Directory.GetCurrentDirectory();
             var replayName = Path.GetFileNameWithoutExtension(_currentReplayFile);
             outputPath = Path.Combine(replayDir, $"{replayName}_actors.json");
         }
 
         _actorRegistry.TotalActorsFound = _actorRegistry.Actors.Count;
+        _actorRegistry.ActorsWithClass = _actorRegistry.Actors.Count(a => a.HasCSharpClass);
+        _actorRegistry.ActorsWithoutClass = _actorRegistry.Actors.Count(a => !a.HasCSharpClass);
         _actorRegistry.ReplayFile = _currentReplayFile ?? "Unknown";
         _actorRegistry.ScanDate = DateTime.Now;
 
         var options = new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
 
         var json = JsonSerializer.Serialize(_actorRegistry, options);
         File.WriteAllText(outputPath, json);
 
-        Console.WriteLine($"✓ Actor registry saved to: {outputPath}");
+        Console.WriteLine($"\n✓ Actor registry saved to: {outputPath}");
         Console.WriteLine($"✓ Total actors found: {_actorRegistry.TotalActorsFound}");
+        Console.WriteLine($"✓ Actors WITH C# class: {_actorRegistry.ActorsWithClass}");
+        Console.WriteLine($"✓ Actors WITHOUT C# class: {_actorRegistry.ActorsWithoutClass}");
     }
 
-    // ← NUEVO MÉTODO: Obtener estadísticas
     public void PrintActorStatistics()
     {
-        var grouped = _actorRegistry.Actors
+        Console.WriteLine("\n=== ACTORS WITHOUT C# CLASS ===");
+        var withoutClass = _actorRegistry.Actors
+            .Where(a => !a.HasCSharpClass)
+            .GroupBy(a => a.PathName)
+            .OrderByDescending(g => g.Count());
+
+        foreach (var group in withoutClass.Take(50))
+        {
+            Console.WriteLine($"{group.Count(),4}x {group.Key}");
+        }
+
+        Console.WriteLine("\n=== TOP 20 MOST COMMON ACTORS WITH CLASS ===");
+        var withClass = _actorRegistry.Actors
+            .Where(a => a.HasCSharpClass)
             .GroupBy(a => a.TypeName)
             .OrderByDescending(g => g.Count())
             .Take(20);
 
-        Console.WriteLine("\n=== TOP 20 MOST COMMON ACTORS ===");
-        foreach (var group in grouped)
+        foreach (var group in withClass)
         {
             Console.WriteLine($"{group.Count(),4}x {group.Key}");
         }
