@@ -22,7 +22,7 @@ using Unreal.Core.Models;
 using Unreal.Core.Models.Enums;
 using Unreal.Encryption;
 using Unreal.Core.Attributes;
-using System.Text.Json;
+using System.Text.Json; // ← Para serializar JSON
 
 namespace FortniteReplayReader;
 
@@ -31,11 +31,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
     private FortniteReplayBuilder Builder;
     public List<WorldActor> AIPawns { get; set; } = new();
     
+    // ← AGREGAR ESTO: Registro de actors
     private ActorRegistry _actorRegistry = new ActorRegistry();
     private string _currentReplayFile;
-    
-    // Diccionario temporal para rastrear pathNames por channel
-    private Dictionary<uint, string> _channelToPathName = new Dictionary<uint, string>();
 
     public ReplayReader(ILogger logger = null, ParseMode parseMode = ParseMode.Minimal) : base(logger, parseMode)
     {
@@ -77,7 +75,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         }
     }
 
-    // ← INTERCEPTAR cuando se abre un channel para capturar el pathName
     protected override void OnChannelOpened(uint channelIndex, NetworkGUID? actor)
     {
         if (actor != null)
@@ -91,7 +88,6 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         if (actor != null)
         {
             Builder.RemoveChannel(channelIndex);
-            _channelToPathName.Remove(channelIndex);
         }
     }
 
@@ -108,37 +104,9 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
         }
     }
 
-    // ← OVERRIDE ReadExportData para capturar ANTES de deserializar
-    protected override INetFieldExportGroup ReadExportData(FArchive archive, NetFieldExportGroup group)
-    {
-        // Registrar el pathName RAW antes de intentar deserializar
-        if (!string.IsNullOrEmpty(group?.PathName))
-        {
-            RegisterRawActor(group.PathName, group.PathNameIndex);
-        }
-
-        // Intentar deserializar
-        INetFieldExportGroup exportGroup = null;
-        try
-        {
-            exportGroup = base.ReadExportData(archive, group);
-            
-            // Si se deserializó correctamente, marcarlo
-            if (exportGroup != null && !string.IsNullOrEmpty(group?.PathName))
-            {
-                MarkActorAsDeserialized(group.PathName, exportGroup);
-            }
-        }
-        catch
-        {
-            // Si falla la deserialización, el actor quedará marcado como sin clase
-        }
-
-        return exportGroup;
-    }
-
     protected override void OnExportRead(uint channelIndex, INetFieldExportGroup? exportGroup)
     {
+        // Primero el switch original
         switch (exportGroup)
         {
             case GameState state:
@@ -182,101 +150,102 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 Builder.UpdateChest(channelIndex, chest);
                 break;
         }
+        
+        // ← REGISTRAR TODOS LOS ACTORS (no solo chests)
+        if (exportGroup != null)
+        {
+            RegisterActor(channelIndex, exportGroup);
+            
+            // Detectar y procesar chests específicamente
+            var typeName = exportGroup.GetType().FullName ?? "";
+            var pathAttribute = exportGroup.GetType()
+                .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+                .Cast<NetFieldExportGroupAttribute>()
+                .FirstOrDefault();
+            
+            var pathName = pathAttribute?.Path ?? "";
+            
+            if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
+                typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
+                pathName.Contains("Chest", StringComparison.OrdinalIgnoreCase) ||
+                pathName.Contains("Container", StringComparison.OrdinalIgnoreCase))
+            {
+                if (exportGroup is BaseContainer container)
+                {
+                    Builder.UpdateChest(channelIndex, container);
+                }
+            }
+        }
     }
 
-    // ← NUEVO: Registrar actor RAW (directamente del replay)
-    private void RegisterRawActor(string pathName, uint pathNameIndex)
+    // ← NUEVO MÉTODO: Registrar actor
+    private void RegisterActor(uint channelIndex, INetFieldExportGroup exportGroup)
     {
-        var exists = _actorRegistry.Actors.Any(a => a.PathName == pathName);
+        var typeName = exportGroup.GetType().FullName ?? "Unknown";
+        var pathAttribute = exportGroup.GetType()
+            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+            .Cast<NetFieldExportGroupAttribute>()
+            .FirstOrDefault();
+        
+        var pathName = pathAttribute?.Path ?? "N/A";
+        
+        // Evitar duplicados exactos
+        var exists = _actorRegistry.Actors.Any(a => 
+            a.TypeName == typeName && 
+            a.PathName == pathName && 
+            a.ChannelIndex == channelIndex);
         
         if (!exists)
         {
             _actorRegistry.Actors.Add(new ActorInfo
             {
-                TypeName = null,
-                FullTypeName = null,
+                TypeName = typeName,
                 PathName = pathName,
-                PathNameIndex = pathNameIndex,
-                HasCSharpClass = false,
-                IsDeserialized = false,
-                OccurrenceCount = 1
+                ChannelIndex = channelIndex
             });
         }
-        else
-        {
-            // Incrementar contador de ocurrencias
-            var actor = _actorRegistry.Actors.First(a => a.PathName == pathName);
-            actor.OccurrenceCount++;
-        }
     }
 
-    // ← NUEVO: Marcar como deserializado
-    private void MarkActorAsDeserialized(string pathName, INetFieldExportGroup exportGroup)
-    {
-        var actor = _actorRegistry.Actors.FirstOrDefault(a => a.PathName == pathName);
-        
-        if (actor != null)
-        {
-            actor.TypeName = exportGroup.GetType().Name;
-            actor.FullTypeName = exportGroup.GetType().FullName;
-            actor.HasCSharpClass = true;
-            actor.IsDeserialized = true;
-        }
-    }
-
+    // ← NUEVO MÉTODO: Guardar el registro al finalizar
     public void SaveActorRegistry(string outputPath = null)
     {
         if (outputPath == null)
         {
+            // Si no se especifica ruta, guardar al lado del replay
             var replayDir = Path.GetDirectoryName(_currentReplayFile) ?? Directory.GetCurrentDirectory();
             var replayName = Path.GetFileNameWithoutExtension(_currentReplayFile);
             outputPath = Path.Combine(replayDir, $"{replayName}_actors.json");
         }
 
         _actorRegistry.TotalActorsFound = _actorRegistry.Actors.Count;
-        _actorRegistry.ActorsWithClass = _actorRegistry.Actors.Count(a => a.HasCSharpClass);
-        _actorRegistry.ActorsWithoutClass = _actorRegistry.Actors.Count(a => !a.HasCSharpClass);
         _actorRegistry.ReplayFile = _currentReplayFile ?? "Unknown";
         _actorRegistry.ScanDate = DateTime.Now;
 
         var options = new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
         var json = JsonSerializer.Serialize(_actorRegistry, options);
         File.WriteAllText(outputPath, json);
 
-        Console.WriteLine($"\n✓ Actor registry saved to: {outputPath}");
-        Console.WriteLine($"✓ Total unique actors: {_actorRegistry.TotalActorsFound}");
-        Console.WriteLine($"✓ Actors WITH C# class: {_actorRegistry.ActorsWithClass}");
-        Console.WriteLine($"✓ Actors WITHOUT C# class: {_actorRegistry.ActorsWithoutClass}");
+        Console.WriteLine($"✓ Actor registry saved to: {outputPath}");
+        Console.WriteLine($"✓ Total actors found: {_actorRegistry.TotalActorsFound}");
     }
 
+    // ← NUEVO MÉTODO: Obtener estadísticas
     public void PrintActorStatistics()
     {
-        Console.WriteLine("\n=== TOP 50 ACTORS WITHOUT C# CLASS ===");
-        var withoutClass = _actorRegistry.Actors
-            .Where(a => !a.HasCSharpClass)
-            .OrderByDescending(a => a.OccurrenceCount)
-            .Take(50);
-
-        foreach (var actor in withoutClass)
-        {
-            Console.WriteLine($"{actor.OccurrenceCount,4}x {actor.PathName}");
-        }
-
-        Console.WriteLine("\n=== TOP 20 MOST COMMON ACTORS WITH CLASS ===");
-        var withClass = _actorRegistry.Actors
-            .Where(a => a.HasCSharpClass)
-            .OrderByDescending(a => a.OccurrenceCount)
+        var grouped = _actorRegistry.Actors
+            .GroupBy(a => a.TypeName)
+            .OrderByDescending(g => g.Count())
             .Take(20);
 
-        foreach (var actor in withClass)
+        Console.WriteLine("\n=== TOP 20 MOST COMMON ACTORS ===");
+        foreach (var group in grouped)
         {
-            Console.WriteLine($"{actor.OccurrenceCount,4}x {actor.TypeName} -> {actor.PathName}");
+            Console.WriteLine($"{group.Count(),4}x {group.Key}");
         }
         Console.WriteLine("==================================\n");
     }
