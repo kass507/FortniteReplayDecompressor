@@ -5,12 +5,8 @@ namespace FortniteReplayReader.Models;
 public class ActorInfo
 {
     public string TypeName { get; set; }
-    public string FullTypeName { get; set; }
     public string PathName { get; set; }
-    public uint PathNameIndex { get; set; }
-    public bool HasCSharpClass { get; set; }
-    public bool IsDeserialized { get; set; }
-    public int OccurrenceCount { get; set; } = 0;  // ← Nuevo: cuántas veces aparece
+    public uint ChannelIndex { get; set; }
 }
 
 public class ActorRegistry
