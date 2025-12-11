@@ -8,7 +8,7 @@ using FortniteReplayReader.Models.NetFieldExports.Weapons;
 using FortniteReplayReader.Models.NetFieldExports.Items;
 using FortniteReplayReader.Models.World;
 using System.Collections.Generic;
-using System.Linq; // ← AGREGAR ESTO
+using System.Linq;
 using FortniteReplayReader;
 using Microsoft.Extensions.Logging;
 using System;
@@ -22,6 +22,7 @@ using Unreal.Core.Models;
 using Unreal.Core.Models.Enums;
 using Unreal.Encryption;
 using Unreal.Core.Attributes;
+using System.Text.Json; // ← Para serializar JSON
 
 namespace FortniteReplayReader;
 
@@ -29,6 +30,10 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 {
     private FortniteReplayBuilder Builder;
     public List<WorldActor> AIPawns { get; set; } = new();
+    
+    // ← AGREGAR ESTO: Registro de actors
+    private ActorRegistry _actorRegistry = new ActorRegistry();
+    private string _currentReplayFile;
 
     public ReplayReader(ILogger logger = null, ParseMode parseMode = ParseMode.Minimal) : base(logger, parseMode)
     {
@@ -36,6 +41,7 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
 
     public FortniteReplay ReadReplay(string fileName)
     {
+        _currentReplayFile = fileName;
         using var stream = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         return ReadReplay(stream);
     }
@@ -145,43 +151,103 @@ public class ReplayReader : Unreal.Core.ReplayReader<FortniteReplay>
                 break;
         }
         
-        // Luego el detector de chests adicionales
+        // ← REGISTRAR TODOS LOS ACTORS (no solo chests)
         if (exportGroup != null)
         {
+            RegisterActor(channelIndex, exportGroup);
+            
+            // Detectar y procesar chests específicamente
             var typeName = exportGroup.GetType().FullName ?? "";
             var pathAttribute = exportGroup.GetType()
                 .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
-                .Cast<NetFieldExportGroupAttribute>()  // ← Usar Cast en lugar de FirstOrDefault directo
+                .Cast<NetFieldExportGroupAttribute>()
                 .FirstOrDefault();
             
             var pathName = pathAttribute?.Path ?? "";
             
-            // Imprimir todos los actors que contengan "Chest" o "Container"
             if (typeName.Contains("Chest", StringComparison.OrdinalIgnoreCase) || 
                 typeName.Contains("Container", StringComparison.OrdinalIgnoreCase) ||
                 pathName.Contains("Chest", StringComparison.OrdinalIgnoreCase) ||
                 pathName.Contains("Container", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"=== FOUND POTENTIAL CHEST ===");
-                Console.WriteLine($"Type: {typeName}");
-                Console.WriteLine($"Path: {pathName}");
-                Console.WriteLine($"Channel: {channelIndex}");
-                
-                // Solo llamar UpdateChest si es BaseContainer
                 if (exportGroup is BaseContainer container)
                 {
                     Builder.UpdateChest(channelIndex, container);
                 }
-                else
-                {
-                    // Si no es BaseContainer, imprimir sus propiedades de todas formas
-                    Console.WriteLine("WARNING: Not a BaseContainer, printing properties:");
-                    Builder.PrintObjectProperties(exportGroup);
-                }
-                
-                Console.WriteLine("============================\n");
             }
         }
+    }
+
+    // ← NUEVO MÉTODO: Registrar actor
+    private void RegisterActor(uint channelIndex, INetFieldExportGroup exportGroup)
+    {
+        var typeName = exportGroup.GetType().FullName ?? "Unknown";
+        var pathAttribute = exportGroup.GetType()
+            .GetCustomAttributes(typeof(NetFieldExportGroupAttribute), false)
+            .Cast<NetFieldExportGroupAttribute>()
+            .FirstOrDefault();
+        
+        var pathName = pathAttribute?.Path ?? "N/A";
+        
+        // Evitar duplicados exactos
+        var exists = _actorRegistry.Actors.Any(a => 
+            a.TypeName == typeName && 
+            a.PathName == pathName && 
+            a.ChannelIndex == channelIndex);
+        
+        if (!exists)
+        {
+            _actorRegistry.Actors.Add(new ActorInfo
+            {
+                TypeName = typeName,
+                PathName = pathName,
+                ChannelIndex = channelIndex
+            });
+        }
+    }
+
+    // ← NUEVO MÉTODO: Guardar el registro al finalizar
+    public void SaveActorRegistry(string outputPath = null)
+    {
+        if (outputPath == null)
+        {
+            // Si no se especifica ruta, guardar al lado del replay
+            var replayDir = Path.GetDirectoryName(_currentReplayFile) ?? Directory.GetCurrentDirectory();
+            var replayName = Path.GetFileNameWithoutExtension(_currentReplayFile);
+            outputPath = Path.Combine(replayDir, $"{replayName}_actors.json");
+        }
+
+        _actorRegistry.TotalActorsFound = _actorRegistry.Actors.Count;
+        _actorRegistry.ReplayFile = _currentReplayFile ?? "Unknown";
+        _actorRegistry.ScanDate = DateTime.Now;
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        var json = JsonSerializer.Serialize(_actorRegistry, options);
+        File.WriteAllText(outputPath, json);
+
+        Console.WriteLine($"✓ Actor registry saved to: {outputPath}");
+        Console.WriteLine($"✓ Total actors found: {_actorRegistry.TotalActorsFound}");
+    }
+
+    // ← NUEVO MÉTODO: Obtener estadísticas
+    public void PrintActorStatistics()
+    {
+        var grouped = _actorRegistry.Actors
+            .GroupBy(a => a.TypeName)
+            .OrderByDescending(g => g.Count())
+            .Take(20);
+
+        Console.WriteLine("\n=== TOP 20 MOST COMMON ACTORS ===");
+        foreach (var group in grouped)
+        {
+            Console.WriteLine($"{group.Count(),4}x {group.Key}");
+        }
+        Console.WriteLine("==================================\n");
     }
 
     protected override void OnExternalDataRead(uint channelIndex, IExternalData? externalData)
