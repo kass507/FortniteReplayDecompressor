@@ -39,12 +39,18 @@ public class SupplyDrop : INetFieldExportGroup
     [NetFieldExport("BalloonPopped", RepLayoutCmdType.PropertyBool)]
     public bool BalloonPopped { get; set; }
 
-    [NetFieldExport("FallSpeed", RepLayoutCmdType.PropertyFloat)]
-    public float FallSpeed { get; set; }
+    [NetFieldExport("FallSpeed", RepLayoutCmdType.PropertyDouble)]
+    public double FallSpeed { get; set; }
 
     [NetFieldExport("LandingLocation", RepLayoutCmdType.PropertyVector)]
     public FVector LandingLocation { get; set; }
 
-    [NetFieldExport("FallHeight", RepLayoutCmdType.PropertyFloat)]
-    public float FallHeight { get; set; }
+    [NetFieldExport("FallHeight", RepLayoutCmdType.PropertyDouble)]
+    public double FallHeight { get; set; }
+
+    [NetFieldExport("FallDirection", RepLayoutCmdType.PropertyVector)]
+    public FVector FallDirection { get; set; }
+
+    [NetFieldExport("bGroundFXDisabled", RepLayoutCmdType.PropertyBool)]
+    public bool bGroundFXDisabled { get; set; }
 }
