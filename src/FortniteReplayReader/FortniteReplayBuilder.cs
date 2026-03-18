@@ -1,6 +1,7 @@
 ﻿using FortniteReplayReader.Models;
 using FortniteReplayReader.Models.NetFieldExports;
 using FortniteReplayReader.Models.NetFieldExports.Weapons;
+using Unreal.Core.Models;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
