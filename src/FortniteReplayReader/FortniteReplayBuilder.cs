@@ -133,12 +133,19 @@ public class FortniteReplayBuilder
 
             foreach (var obj in state.TeamFlightPaths.Array)
             {
-                if (obj is DebuggingObject path)
+                if (obj is DebuggingObject dbg)
                 {
-                    list.Add(new BattleBus(path)
+                    var aircraft = dbg.PotentialProperties
+                        .OfType<Aircraft>()
+                        .FirstOrDefault();
+
+                    if (aircraft != null)
                     {
-                        Skin = state.DefaultBattleBus?.Name
-                    });
+                        list.Add(new BattleBus(aircraft)
+                        {
+                            Skin = state.DefaultBattleBus?.Name
+                        });
+                    }
                 }
             }
 
