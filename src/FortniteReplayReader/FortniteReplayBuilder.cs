@@ -127,7 +127,23 @@ public class FortniteReplayBuilder
         GameData.AircraftStartTime ??= state.AircraftStartTime;
         GameData.SafeZonesStartTime ??= state.SafeZonesStartTime;
 
-        MapData.BattleBusFlightPaths ??= state.TeamFlightPaths?.Select(i => new BattleBus(i) { Skin = state.DefaultBattleBus?.Name });
+        if (MapData.BattleBusFlightPaths == null && state.TeamFlightPaths?.Array != null)
+        {
+            var list = new List<BattleBus>();
+
+            foreach (var obj in state.TeamFlightPaths.Array)
+            {
+                if (obj is DebuggingObject path)
+                {
+                    list.Add(new BattleBus(path)
+                    {
+                        Skin = state.DefaultBattleBus?.Name
+                    });
+                }
+            }
+
+            MapData.BattleBusFlightPaths = list;
+        }
 
         if (state.ReplicatedWorldTimeSeconds != null)
         {
